@@ -1,0 +1,25 @@
+﻿  SemanticQA.cpp
+H:\Code\SemanticQA\SemanticQA\Utils.hpp(29): warning #1786: function "localtime" (declared at line 112 of "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include\time.inl") was declared deprecated ("This function or variable may be unsafe. Consider using localtime_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.")
+    	struct tm* current_time = localtime(&log_time);
+    	                          ^
+  
+H:\Code\SemanticQA\SemanticQA\Logging.hpp(16): warning #1786: function "localtime" (declared at line 112 of "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include\time.inl") was declared deprecated ("This function or variable may be unsafe. Consider using localtime_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.")
+    		struct tm* current_time = localtime(&log_time);
+    		                          ^
+  
+H:\Code\SemanticQA\SemanticQA\Logging.hpp(32): warning #1786: function "localtime" (declared at line 112 of "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include\time.inl") was declared deprecated ("This function or variable may be unsafe. Consider using localtime_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.")
+    		struct tm* current_time = localtime(&log_time);
+    		                          ^
+  
+H:\Code\SemanticQA\SemanticQA\Logging.hpp(52): warning #1786: function "localtime" (declared at line 112 of "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include\time.inl") was declared deprecated ("This function or variable may be unsafe. Consider using localtime_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.")
+    		struct tm* current_time = localtime(&log_time);
+    		                          ^
+  
+H:\Code\SemanticQA\SemanticQA\Logging.hpp(79): warning #1786: function "localtime" (declared at line 112 of "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include\time.inl") was declared deprecated ("This function or variable may be unsafe. Consider using localtime_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.")
+    		struct tm* current_time = localtime(&log_time);
+    		                          ^
+  
+H:\Code\SemanticQA\SemanticQA\Model.hpp(46): warning #3180: unrecognized OpenMP #pragma
+    #pragma omp parallel for
+            ^
+  
