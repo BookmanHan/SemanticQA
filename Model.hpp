@@ -64,6 +64,7 @@ public:
 		for (auto ind_turn = 0; ind_turn < epos; ++ind_turn)
 		{
 			logout.record() << "Round @ " << ind_turn;
+			logout.flush();
 
 			train_kernel();
 
