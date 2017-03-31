@@ -12,7 +12,7 @@ public:
 	FormatFile(
 		const string name,
 		const string file_path,
-		const ios::ios_base::openmode open_mode,
+		const ios_base::openmode open_mode,
 		Storage& stg = *Storage::global_system)
 		:stg(stg), name(name)
 	{
@@ -21,7 +21,7 @@ public:
 
 	FormatFile(
 		const string file_path,
-		const ios::ios_base::openmode open_mode,
+		const ios_base::openmode open_mode,
 		Storage& stg = *Storage::global_system)
 		:stg(stg), name(file_path)
 	{
@@ -52,7 +52,7 @@ public:
 
 	virtual void reset()
 	{
-		throw exception("Not Implemented.");
+		throw ("Not Implemented.");
 	}
 };
 
@@ -69,7 +69,7 @@ protected:
 		fin.read((char*)&word_size, sizeof(char));
 
 		if (word_size != sizeof(int))
-			throw exception("Address Model Unmatched.");
+			throw ("Address Model Unmatched.");
 	}
 
 	FormatLoad(const string file_path)
@@ -81,7 +81,7 @@ protected:
 		fin.read((char*)&word_size, sizeof(char));
 
 		if (word_size != sizeof(int))
-			throw exception("Address Model Unmatched.");
+			throw ("Address Model Unmatched.");
 	}
 
 	virtual ~FormatLoad()

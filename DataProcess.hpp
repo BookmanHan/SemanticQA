@@ -128,7 +128,7 @@ void data_preprocess()
 	{
 		string strin;
 		getline(fin_des, strin);
-		transform(strin.begin(), strin.end(), strin.begin(), ::tolower);
+		transform(strin.begin(), strin.end(), strin.begin(), [=](char c){return tolower(c); });
 
 		boost::tokenizer<boost::char_separator<char>> token(strin, sep);
 		string uid;

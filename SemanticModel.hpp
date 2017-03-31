@@ -36,7 +36,7 @@ public:
 		_p.rep_relation_obj.resize(relation_count);
 		for_each(_p.rep_relation_obj.begin(), _p.rep_relation_obj.end(),
 			[=](vec& elem){elem = normalise(randu(dim), 2); });
-
+  
 		_p.rep_word.resize(word_count); 
 		for_each(_p.rep_word.begin(), _p.rep_word.end(),
 			[=](vec& elem){elem = normalise(randu(dim), 2); });
@@ -90,87 +90,49 @@ public:
 	}
 
 public:
-	vec prob_des(const vector<int>& entity_des)
-	{
-		vec result = ones(dim);
-		for (auto i = entity_des.begin(); i != entity_des.end(); ++i)
-		{
-			result %= _p.rep_word[*i];
-		}
-
-		return result;
-	}
-
-	double prob(const tuple<int, int, int>& triplet, const vector<int>& head_des, const vector<int>& tail_des)
+	double prob(const tuple<int, int, int>& triplet)
 	{
 		vec& head = _p.rep_entity[get<0>(triplet)];
 		vec& tail = _p.rep_entity[get<2>(triplet)];
 		vec& relation_head = _p.rep_relation_subj[get<1>(triplet)];
 		vec& relation_tail = _p.rep_relation_obj[get<1>(triplet)];
-		vec rep_head = prob_des(head_des);
-		vec rep_tail = prob_des(tail_des);
 
-		rep_head /= sum(rep_head);
-		rep_tail /= sum(rep_tail);
+		vec head_feature = head % relation_head;
+		vec tail_feature = tail % relation_tail;
 
-		vec head_feature = head % relation_head % rep_head;
-		vec tail_feature = tail % relation_tail % rep_tail;
-
-		return log(sum(head_feature % tail_feature)) * sigma
+		double score = log(sum(head_feature % tail_feature)) * sigma
 			- sum(abs(head_feature - tail_feature));
+
+		return score;
 	}
 
-	void train(const tuple<int, int, int>& triplet, const vector<int>& head_des, const vector<int>& tail_des, const double alpha)
+	void train_knowledge
+		(const tuple<int, int, int>& triplet, const double alpha)
 	{
 		vec& head = _p.rep_entity[get<0>(triplet)];
 		vec& tail = _p.rep_entity[get<2>(triplet)];
 		vec& relation_head = _p.rep_relation_subj[get<1>(triplet)];
 		vec& relation_tail = _p.rep_relation_obj[get<1>(triplet)];
-		vec rep_head_p = prob_des(head_des);
-		vec rep_tail_p = prob_des(tail_des);
-		vec rep_head = rep_head_p / sum(rep_head_p);
-		vec rep_tail = rep_tail_p / sum(rep_tail_p);
 
-		vec head_feature = head % relation_head % rep_head;
-		vec tail_feature = tail % relation_tail % rep_tail;
+		vec head_feature = head % relation_head;
+		vec tail_feature = tail % relation_tail;
 		vec feature = head_feature % tail_feature;
 		vec grad = sign(head_feature - tail_feature);
 
-		vec grad_head = -alpha * grad % head_feature / head
-			+ alpha * feature / head / sum(feature) * sigma;
-		vec grad_relation_head = -alpha * grad % head_feature / relation_head
-			+ alpha * feature / relation_head / sum(feature) * sigma;
-		vec grad_tail = alpha * grad % tail_feature / tail
-			+ alpha * feature / tail / sum(feature) * sigma;
-		vec grad_relation_tail = alpha * grad % tail_feature / relation_tail
-			+ alpha * feature / relation_tail / sum(feature) * sigma;
+		double sum_feature = sum(feature) + 1e-50;
 
-		vec grad_word_head = -alpha * grad % head_feature / rep_head
-			+ alpha * feature / rep_head / sum(feature) * sigma;
-		vec grad_word_tail = alpha * grad % tail_feature / rep_tail
-			+ alpha * feature / rep_tail / sum(feature) * sigma;
-
-		for (auto i = head_des.begin(); i != head_des.end(); ++i)
-		{
-			vec grad_word = normalise(
-				grad_word_head % rep_head % (1.0/_p.rep_word[*i] - sum(rep_head_p/_p.rep_word[*i])/sum(rep_head_p)));
-			solver.gradient(
-				_derv_grad.rep_word[*i], 
-				_derv_x.rep_word[*i], 
-				_p.rep_word[*i], 
-				grad_word);
-		}
-
-		for (auto i = tail_des.begin(); i != tail_des.end(); ++i)
-		{
-			vec grad_word = normalise(
-				grad_word_tail % rep_tail % (1.0 / _p.rep_word[*i] - sum(rep_tail_p / _p.rep_word[*i]) / sum(rep_tail_p)));
-			solver.gradient(
-				_derv_grad.rep_word[*i], 
-				_derv_x.rep_word[*i], 
-				_p.rep_word[*i],
-				grad_word);
-		}
+		vec grad_head =
+			-alpha * grad % head_feature / head
+			+ alpha * feature / head / sum_feature * sigma;
+		vec grad_relation_head =
+			-alpha * grad % head_feature / relation_head
+			+ alpha * feature / relation_head / sum_feature * sigma;
+		vec grad_tail =
+			alpha * grad % tail_feature / tail
+			+ alpha * feature / tail / sum_feature * sigma;
+		vec grad_relation_tail =
+			alpha * grad % tail_feature / relation_tail
+			+ alpha * feature / relation_tail / sum_feature * sigma;
 
 		solver.gradient(
 			_derv_grad.rep_entity[get<0>(triplet)],
@@ -196,6 +158,30 @@ public:
 			_p.rep_relation_obj[get<1>(triplet)],
 			grad_relation_tail);
 	}
+
+	void train_language
+		(const int eid, const vector<int>& descriptions, const double alpha)
+	{
+		vec& entity = _p.rep_entity[eid];
+		vec grad_entity = zeros(dim);
+
+		for (auto i = descriptions.begin(); i != descriptions.end(); ++i)
+		{
+			grad_entity -= alpha * sign(entity - _p.rep_word[*i]);
+			vec grad_word = alpha * sign(entity - _p.rep_word[*i]);
+			solver.gradient(
+				_derv_grad.rep_word[*i],
+				_derv_x.rep_word[*i],
+				_p.rep_word[*i],
+				grad_word);
+		}
+
+		solver.gradient(
+			_derv_grad.rep_entity[eid],
+			_derv_x.rep_entity[eid],
+			_p.rep_entity[eid],
+			grad_entity);
+	}
 };
 
 class JointMFactor
@@ -203,6 +189,8 @@ class JointMFactor
 {
 protected:
 	vector<JointMFactorUnit*>	factors;
+	vector<vec> rep_entity;
+	vector<vec> rep_word;
 
 public:
 	AscentAdaDeltaPositive& solver;
@@ -239,37 +227,45 @@ public:
 	}
 
 public:
-	virtual double probability(const tuple<int, int, int>& datum, const vector<int>& des_head, const vector<int>& des_tail) override
+	virtual double probability(const tuple<int, int, int>& datum) override
 	{
 		vec score(n_factor);
 		auto i_score = score.begin();
 		for (auto factor : factors)
 		{
-			*i_score++ = factor->prob(datum, des_head, des_tail);
+			*i_score++ = factor->prob(datum);
 		}
 
 		return sum(score);
 	}
 
-	virtual void train_once(const tuple<int, int, int>& datum, const vector<int>& des_head, const vector<int>& des_tail) override
+	virtual void train_knowledge(const tuple<int, int, int>& datum) override
 	{
-		tuple<int, int, int> triplet_f = datum;
+		tuple<int, int, int> triplet_false = datum;
 		if (randu() > 0.5)
 		{
-			get<0>(triplet_f) = rand() % dm.n_entity;
+			get<0>(triplet_false) = rand() % dm.n_entity;
 		}
 		else
 		{
-			get<2>(triplet_f) = rand() % dm.n_entity;
+			get<2>(triplet_false) = rand() % dm.n_entity;
 		}
 
-		if (probability(datum, des_head, des_tail)-probability(triplet_f, des_head, des_tail) > margin)
+		if (probability(datum) - probability(triplet_false) > margin)
 			return;
 
-		for (auto i = 0; i < n_factor; ++i)
+		for (auto factor : factors)
 		{
-			factors[i]->train(datum, des_head, des_tail, alpha);
-			factors[i]->train(triplet_f, des_head, des_tail, - alpha);
+			factor->train_knowledge(datum, alpha);
+			factor->train_knowledge(triplet_false, -alpha);
+		}
+	}
+
+	virtual void train_language(const int eid, const vector<int>& description) override
+	{
+		for (auto factor : factors)
+		{
+			factor->train_language(eid, description, alpha);
 		}
 	}
 
@@ -279,6 +275,9 @@ public:
 		{
 			factor->save(file);
 		}
+
+		file << rep_entity;
+		file << rep_word;
 	}
 
 	virtual void load(FormatFile & file) override
@@ -287,27 +286,69 @@ public:
 		{
 			factor->load(file);
 		}
+
+		file >> rep_entity;
+		file >> rep_word;
 	}
 
-	virtual int infer_entity(const vector<int>& des) override
+	virtual vector<int> infer_entity(const vector<int>& des) override
 	{
-		vec prob_ent = ones(dm.n_entity);
-
-		for (auto factor : factors)
+		vector<pair<double, int>> prob_ent(dm.n_entity);
+		for (auto i = 0; i < dm.n_entity; ++i)
 		{
-			vec rep_des = factor->prob_des(des);
-			rep_des /= sum(rep_des);
-			for (auto i = 0; i < dm.n_entity; ++i)
+			prob_ent[i].second = i;
+		}
+
+		vec rep_query = zeros(n_factor * dim);
+		for (auto ie = 0; ie < dm.n_entity; ++ie)
+		{
+			prob_ent[ie].first = 1.0;
+			for (auto iw = des.begin(); iw != des.end(); ++iw)
 			{
-				prob_ent[i] *= as_scalar(rep_des.t() * factor->_p.rep_entity[i]);
+				prob_ent[ie].first *= sum(abs(rep_word[*iw] - rep_entity[ie]));
 			}
 		}
 
-		return prob_ent.index_max();
+		sort(prob_ent.begin(), prob_ent.end());
+
+		vector<int> res;
+		for (int i = 0; i < 10; ++i)
+		{
+			res.push_back(prob_ent[i].second);
+		}
+
+		return res;
 	}
 
 	virtual int infer_relation(const vector<int>& des) override
 	{
 		return 0;
+	}
+
+	virtual void train_kernel() override
+	{
+		Model::train_kernel();
+
+		rep_word.resize(dm.n_word);
+		for (auto i = 0; i < dm.n_word; ++i)
+		{
+			vec tmp;
+			for (auto factor : factors)
+			{
+				tmp = join_cols(tmp, factor->_p.rep_word[i]);
+			}
+			rep_word[i] = tmp;
+		}
+
+		rep_entity.resize(dm.n_entity);
+		for (auto i = 0; i < dm.n_entity; ++i)
+		{			
+			vec tmp;
+			for (auto factor : factors)
+			{
+				tmp = join_cols(tmp, factor->_p.rep_entity[i]);
+			}
+			rep_entity[i] = tmp;
+		}
 	}
 };

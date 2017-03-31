@@ -18,10 +18,11 @@ public:
 	}
 
 public:
-	virtual double probability(const tuple<int, int, int>& datum, const vector<int>& des_head, const vector<int>& des_tail) = 0;
-	virtual int infer_entity(const vector<int>& des) = 0;
+	virtual double probability(const tuple<int, int, int>& datum) = 0;
+	virtual vector<int> infer_entity(const vector<int>& des) = 0;
 	virtual int infer_relation(const vector<int>& des) = 0;
-	virtual void train_once(const tuple<int, int, int>& datum, const vector<int>& des_head, const vector<int>& des_tail) = 0;
+	virtual void train_knowledge(const tuple<int, int, int>& datum) = 0;
+	virtual void train_language(const int eid, const vector<int>& description) = 0;
 	virtual void save(FormatFile & file) = 0;
 	virtual void load(FormatFile & file) = 0;
 
@@ -43,10 +44,16 @@ public:
 public:
 	virtual void train_kernel()
 	{
-//#pragma omp parallel for
+#pragma omp parallel for
 		for (auto i = dm.knowledge.begin();   i != dm.knowledge.end(); ++i)
 		{
-			train_once(*i, dm.description[get<0>(*i)], dm.description[get<2>(*i)]);
+			train_knowledge(*i);
+		}
+
+#pragma omp parallel for
+		for (int i = 0; i != dm.n_entity; ++i)
+		{
+			train_language(i, dm.description[i]);
 		}
 	}
 

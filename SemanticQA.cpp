@@ -12,35 +12,43 @@ int main(int argc, char* argv[])
 {
 	AscentAdaDeltaPositive solver(0.6, 1e-6);
 	solver.logout_parameter();
-	Model* model = new JointMFactor(FB15K, 1, 5, 0.001, 2.5, 0.04, solver);
-	//model->load("H:\\now.model");
-	model->train(10, [&](int epos){if (epos % 10 == 0) model->save("H:\\now.model"); });
+	Model* model = new JointMFactor(FB15K, 10, 5, 0.001, 2.5, 0.04, solver);
+	model->load("H:\\now.model");
+	//model->train(20, [&](int epos){if (epos % 10 == 0) model->save("H:\\now.model"); });
 
 	while (true)
 	{
 		boost::char_separator<char> sep(" \t \"\',.\\?!#%@-;:=+-()[]");
 		string strin;
 		
-		logout.record() << "[Input]";
+		logout.record().record() << "[Input]";
 		getline(cin, strin);
-		transform(strin.begin(), strin.end(), strin.begin(), tolower);
+		transform(strin.begin(), strin.end(), strin.begin(), [=](char c){return tolower(c); });
 
 		boost::tokenizer<boost::char_separator<char>> token(strin, sep);
 		vector<int> entity_description;
 		for (auto i = token.begin(); i != token.end(); ++i)
 		{
-			entity_description.push_back(model->dm.words[*i]);
+			if (model->dm.words.find(*i) != model->dm.words.end())
+				entity_description.push_back(model->dm.words[*i]);
 		}
 
-		int eid = model->infer_entity(entity_description);
-		string edes;
-		for (auto i = model->dm.description[eid].begin(); i != model->dm.description[eid].end(); ++i)
+		vector<int> eid = model->infer_entity(entity_description);
+		for (auto val=eid.begin(); val!=eid.end(); ++val)
 		{
-			edes += model->dm.name[*i] + " ";
-		}
+			if (*val >= model->dm.n_entity)
+				continue;
 
-		logout.record() << "[Question]" << strin;
-		logout.record() << "[Answer]" << edes;
+			string edes;
+			for (auto i = model->dm.description[*val].begin(); 
+				i != min(model->dm.description[*val].begin() + 5, model->dm.description[*val].end()); 
+				++i)
+			{
+				if (*i <model->dm.n_word)
+					edes += model->dm.name[*i] + " ";
+			}
+			logout.record() << "[Answer]" << edes;
+		}
 	}
 
 	return 0;

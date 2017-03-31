@@ -67,16 +67,6 @@ public:
 		current.bm_accu = 0;
 		int n_TOTAL = 1000;
 
-#pragma omp parallel for
-		for (auto i = dm.ds_question.begin(); i != dm.ds_question.begin() + 1000; ++i)
-		{
-			int id_ent = model->infer_entity(i->second);
-
-			if (id_ent == get<2>(i->first))
-#pragma omp critical
-				++current.bm_accu;
-		}
-
 		current.bm_accu /= n_TOTAL;
 
 		string inc_mark_hit = "";
