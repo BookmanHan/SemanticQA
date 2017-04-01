@@ -13,36 +13,17 @@ class Namer
 {
 public:
 	map<S, int> finder;
-	bool locked;
 
 public:
-	Namer()
-		:locked(false)
-	{
-		;
-	}
-
 	int get(const S& a)
 	{
 		auto i = finder.find(a);
-		if (i == finder.end() && !locked)
+		if (i == finder.end())
 		{
 			finder[a] = finder.size();
-			return finder.size() - 1;
 		}
-		else if (i == finder.end() && locked)
-		{
-			return finder.size();
-		}
-		else
-		{
-			return i->second;
-		}
-	}
 
-	void lock()
-	{
-		locked = true;
+		return finder[a];
 	}
 };
 

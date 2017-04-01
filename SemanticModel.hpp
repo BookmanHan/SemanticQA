@@ -43,35 +43,35 @@ public:
 
 		_derv_x.rep_entity.resize(entity_count);
 		for_each(_derv_x.rep_entity.begin(), _derv_x.rep_entity.end(),
-			[=](vec& elem){elem = normalise(zeros(dim), 2); });
+			[=](vec& elem){elem = zeros(dim); });
 
 		_derv_x.rep_relation_subj.resize(relation_count);
 		for_each(_derv_x.rep_relation_subj.begin(), _derv_x.rep_relation_subj.end(),
-			[=](vec& elem){elem = normalise(zeros(dim), 2); });
+			[=](vec& elem){elem = zeros(dim); });
 
 		_derv_x.rep_relation_obj.resize(relation_count);
 		for_each(_derv_x.rep_relation_obj.begin(), _derv_x.rep_relation_obj.end(),
-			[=](vec& elem){elem = normalise(zeros(dim), 2); });
+			[=](vec& elem){elem = zeros(dim); });
 
 		_derv_x.rep_word.resize(word_count);
 		for_each(_derv_x.rep_word.begin(), _derv_x.rep_word.end(),
-			[=](vec& elem){elem = normalise(zeros(dim), 2); });
+			[=](vec& elem){elem = zeros(dim); });
 
 		_derv_grad.rep_entity.resize(entity_count);
 		for_each(_derv_grad.rep_entity.begin(), _derv_grad.rep_entity.end(),
-			[=](vec& elem){elem = normalise(zeros(dim), 2); });
+			[=](vec& elem){elem = zeros(dim); });
 
 		_derv_grad.rep_relation_subj.resize(relation_count);
 		for_each(_derv_grad.rep_relation_subj.begin(), _derv_grad.rep_relation_subj.end(),
-			[=](vec& elem){elem = normalise(zeros(dim), 2); });
+			[=](vec& elem){elem = zeros(dim); });
 
 		_derv_grad.rep_relation_obj.resize(relation_count);
 		for_each(_derv_grad.rep_relation_obj.begin(), _derv_grad.rep_relation_obj.end(),
-			[=](vec& elem){elem = normalise(zeros(dim), 2); });
+			[=](vec& elem){elem = zeros(dim); });
 
 		_derv_grad.rep_word.resize(word_count);
 		for_each(_derv_grad.rep_word.begin(), _derv_grad.rep_word.end(),
-			[=](vec& elem){elem = normalise(zeros(dim), 2); });
+			[=](vec& elem){elem = zeros(dim); });
 	}
 
 public:
@@ -122,10 +122,10 @@ public:
 		double sum_feature = sum(feature) + 1e-50;
 
 		vec grad_head =
-			-alpha * grad % head_feature / head
+			- alpha * grad % head_feature / head
 			+ alpha * feature / head / sum_feature * sigma;
 		vec grad_relation_head =
-			-alpha * grad % head_feature / relation_head
+			- alpha * grad % head_feature / relation_head
 			+ alpha * feature / relation_head / sum_feature * sigma;
 		vec grad_tail =
 			alpha * grad % tail_feature / tail
@@ -160,27 +160,34 @@ public:
 	}
 
 	void train_language
-		(const int eid, const vector<int>& descriptions, const double alpha)
+		(const int eid, const vector<int>& descriptions)
 	{
 		vec& entity = _p.rep_entity[eid];
 		vec grad_entity = zeros(dim);
 
 		for (auto i = descriptions.begin(); i != descriptions.end(); ++i)
 		{
-			grad_entity -= alpha * sign(entity - _p.rep_word[*i]);
-			vec grad_word = alpha * sign(entity - _p.rep_word[*i]);
-			solver.gradient(
-				_derv_grad.rep_word[*i],
-				_derv_x.rep_word[*i],
-				_p.rep_word[*i],
-				grad_word);
+			grad_entity -= sign(entity - _p.rep_word[*i]);
+			_p.rep_word[*i] += entity;
 		}
 
-		solver.gradient(
-			_derv_grad.rep_entity[eid],
-			_derv_x.rep_entity[eid],
-			_p.rep_entity[eid],
-			grad_entity);
+		//solver.gradient(
+		//	_derv_grad.rep_entity[eid],
+		//	_derv_x.rep_entity[eid],
+		//	_p.rep_entity[eid],
+		//	grad_entity);
+	}
+
+	void pre_train_language()
+	{
+		for_each(_p.rep_word.begin(), _p.rep_word.end(),
+			[=](vec& elem){elem = zeros(dim); });
+	}
+
+	void post_train_language()
+	{
+		for_each(_p.rep_word.begin(), _p.rep_word.end(),
+			[=](vec& elem){elem = normalise(elem, 2); });
 	}
 };
 
@@ -197,7 +204,6 @@ public:
 
 public:
 	const double	margin;
-	const double	alpha;
 	const int		dim;
 	const int		n_factor;
 	const double	sigma;
@@ -207,15 +213,13 @@ public:
 		const DataSet& ds,
 		int n_factor,
 		int dim,
-		double alpha,
 		double margin,
 		double sigma,
 		AscentAdaDeltaPositive& solver)
-		:Model(ds), margin(margin), alpha(alpha), dim(dim), n_factor(n_factor), sigma(sigma), solver(solver)
+		:Model(ds), margin(margin), dim(dim), n_factor(n_factor), sigma(sigma), solver(solver)
 	{
 		logout.record() << "[Name]\tJoint.Multiple.FactorE";
 		logout.record() << "[Dimension]\t" << dim;
-		logout.record() << "[Learning Rate]\t" << alpha;
 		logout.record() << "[Sigma]\t" << sigma;
 		logout.record() << "[Training Threshold]\t" << margin;
 		logout.record() << "[Factor Number]\t" << n_factor;
@@ -241,23 +245,15 @@ public:
 
 	virtual void train_knowledge(const tuple<int, int, int>& datum) override
 	{
-		tuple<int, int, int> triplet_false = datum;
-		if (randu() > 0.5)
-		{
-			get<0>(triplet_false) = rand() % dm.n_entity;
-		}
-		else
-		{
-			get<2>(triplet_false) = rand() % dm.n_entity;
-		}
+		tuple<int, int, int> triplet_false = dm.negtive_sample(datum);
 
 		if (probability(datum) - probability(triplet_false) > margin)
 			return;
 
 		for (auto factor : factors)
 		{
-			factor->train_knowledge(datum, alpha);
-			factor->train_knowledge(triplet_false, -alpha);
+			factor->train_knowledge(datum, 1.0);
+			factor->train_knowledge(triplet_false, -1.0);
 		}
 	}
 
@@ -265,7 +261,7 @@ public:
 	{
 		for (auto factor : factors)
 		{
-			factor->train_language(eid, description, alpha);
+			factor->train_language(eid, description);
 		}
 	}
 
@@ -299,23 +295,37 @@ public:
 			prob_ent[i].second = i;
 		}
 
-		vec rep_query = zeros(n_factor * dim);
+		vec rep_query = ones(n_factor * dim);
+		for (auto iw = des.begin(); iw != des.end(); ++iw)
+		{
+			rep_query %= rep_word[*iw];
+		}
+		rep_query = normalise(rep_query, 2);
+
 		for (auto ie = 0; ie < dm.n_entity; ++ie)
 		{
-			prob_ent[ie].first = 1.0;
-			for (auto iw = des.begin(); iw != des.end(); ++iw)
-			{
-				prob_ent[ie].first *= sum(abs(rep_word[*iw] - rep_entity[ie]));
-			}
+			prob_ent[ie].first = as_scalar(rep_query.t() * rep_entity[ie]);
 		}
 
-		sort(prob_ent.begin(), prob_ent.end());
+		//for (auto ie = 0; ie < dm.n_entity; ++ie)
+		//{
+		//	prob_ent[ie].first = 0.0;
+		//	for (auto iw = des.begin(); iw != des.end(); ++iw)
+		//	{
+		//		prob_ent[ie].first += as_scalar(rep_word[*iw].t() * rep_entity[ie]);
+		//	}
+		//}
+
+		sort(prob_ent.begin(), prob_ent.end(), greater<pair<double, int>>());
 
 		vector<int> res;
-		for (int i = 0; i < 10; ++i)
+		for (int i = 0; i < 100; ++i)
 		{
 			res.push_back(prob_ent[i].second);
 		}
+
+		for_each(prob_ent.begin(), prob_ent.begin() + 100,
+			[=](pair<double, int>& elem){cout << elem.first << '\t'; });
 
 		return res;
 	}
@@ -325,9 +335,22 @@ public:
 		return 0;
 	}
 
-	virtual void train_kernel() override
+	virtual void train_kernel(function<void()> fn_middle_process = [&](){}) override
 	{
-		Model::train_kernel();
+		Model::train_kernel(
+			[&](void)
+		{
+			fn_middle_process();
+			for (auto factor : factors)
+			{
+				factor->pre_train_language();
+			}
+		});
+
+		for (auto factor : factors)
+		{
+			factor->post_train_language();
+		}
 
 		rep_word.resize(dm.n_word);
 		for (auto i = 0; i < dm.n_word; ++i)

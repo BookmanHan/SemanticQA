@@ -42,13 +42,15 @@ public:
 	}
 
 public:
-	virtual void train_kernel()
+	virtual void train_kernel(function<void()> fn_middle_process = [&](){})
 	{
 #pragma omp parallel for
 		for (auto i = dm.knowledge.begin();   i != dm.knowledge.end(); ++i)
 		{
 			train_knowledge(*i);
 		}
+
+		fn_middle_process();
 
 #pragma omp parallel for
 		for (int i = 0; i != dm.n_entity; ++i)

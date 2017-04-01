@@ -10,14 +10,21 @@ public:
 	const DataSet& ds;
 
 public:
-	vector<tuple<int, int, int>> knowledge;
-	vector<vector<int>> description;
-	vector<tuple<int, int, int>> ds_train;
-	vector<tuple<int, int, int>> ds_valid;
-	vector<tuple<int, int, int>> ds_test;
-	vector<pair<tuple<int, int, int>, vector<int>>> ds_question;
-	map<string, int>	 words;
-	vector<string> name;
+	vector<tuple<int, int, int>>						knowledge;
+	vector<vector<int>>							description;
+	vector<tuple<int, int, int>>						ds_train;
+	vector<tuple<int, int, int>>						ds_valid;
+	vector<tuple<int, int, int>>						ds_test;
+	vector<pair<tuple<int, int, int>, vector<int>>>	ds_question;
+	map<string, int>									words;
+	vector<string>									name;
+
+public:
+	map<int, map<int, vector<int> > >     rel_heads;
+	map<int, map<int, vector<int> > >     rel_tails;
+	vector<double>						relation_tph;
+	vector<double>						relation_hpt;
+	set<tuple<int, int, int>>				sampling_checker;
 
 public:
 	int n_entity;
@@ -68,6 +75,61 @@ public:
 		logout.record() << "[Data Description] Question Number = " << n_question;
 		logout.record() << "[Data Description] Word Number = " << n_word;
 
+		for (auto i = knowledge.begin(); i != knowledge.end(); ++i)
+		{
+			rel_heads[get<1>(*i)][get<0>(*i)].push_back(get<2>(*i));
+			rel_tails[get<1>(*i)][get<2>(*i)].push_back(get<0>(*i));
+		}
+
+		relation_tph.resize(n_relation);
+		for (auto i = 0; i != n_relation; ++i)
+		{
+			double sum = 0;
+			double total = 0;
+			for (auto ds = rel_heads[i].begin(); ds != rel_heads[i].end(); ++ds)
+			{
+				++sum;
+				total += ds->second.size();
+			}
+			relation_tph[i] = total / sum;
+		}
+
+		relation_hpt.resize(n_relation);
+		for (auto i = 0; i != n_relation; ++i)
+		{
+			double sum = 0;
+			double total = 0;
+			for (auto ds = rel_tails[i].begin(); ds != rel_tails[i].end(); ++ds)
+			{
+				++sum;
+				total += ds->second.size();
+			}
+			relation_hpt[i] = total / sum;
+		}
+
+		logout.record() << "[Data Analysis] Done.";
 		logout.record();
+	}
+
+public:
+	tuple<int, int, int> negtive_sample(const tuple<int, int, int>& datum) const
+	{
+		double prob = relation_hpt[get<1>(datum)] / (relation_hpt[get<1>(datum)] + relation_tph[get<1>(datum)]);
+		tuple<int, int, int> neg_sample = datum;
+
+		while (true)
+		{
+			if (randu() < prob)
+			{
+				get<2>(neg_sample) = rand() % n_entity;
+			}
+			else
+			{
+				get<0>(neg_sample) = rand() % n_entity;
+			}
+
+			if (sampling_checker.find(neg_sample) == sampling_checker.end())
+				return neg_sample;
+		}
 	}
 };
