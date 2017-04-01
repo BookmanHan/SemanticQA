@@ -16,8 +16,8 @@ int main(int argc, char* argv[])
 	AscentAdaDeltaPositive solver(0.6, 1e-6);
 	solver.logout_parameter();
 	Model* model = new JointMFactor(FB15K, 100, 10, 2.5, 0.04, solver);
-	model->load("H:\\now.model");
-	//model->train(10, [&](int epos){if (epos % 10 == 0) model->save("H:\\now.model"); });
+	//model->load("H:\\now.model");
+	model->train(1000, [&](int epos){if (epos % 10 == 0) model->save("H:\\now.model"); });
 
 	while (true)
 	{

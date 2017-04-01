@@ -171,11 +171,11 @@ public:
 			_p.rep_word[*i] += entity;
 		}
 
-		//solver.gradient(
-		//	_derv_grad.rep_entity[eid],
-		//	_derv_x.rep_entity[eid],
-		//	_p.rep_entity[eid],
-		//	grad_entity);
+		solver.gradient(
+			_derv_grad.rep_entity[eid],
+			_derv_x.rep_entity[eid],
+			_p.rep_entity[eid],
+			grad_entity);
 	}
 
 	void pre_train_language()
@@ -319,13 +319,14 @@ public:
 		sort(prob_ent.begin(), prob_ent.end(), greater<pair<double, int>>());
 
 		vector<int> res;
-		for (int i = 0; i < 100; ++i)
+		for (int i = 0; i < 10; ++i)
 		{
 			res.push_back(prob_ent[i].second);
 		}
 
-		for_each(prob_ent.begin(), prob_ent.begin() + 100,
-			[=](pair<double, int>& elem){cout << elem.first << '\t'; });
+		logout.record() << "[Values] ";
+		for_each(prob_ent.begin(), prob_ent.begin() + 10,
+			[=](pair<double, int>& elem){logout << elem.first << ", "; });
 
 		return res;
 	}
