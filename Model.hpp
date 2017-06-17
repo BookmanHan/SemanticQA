@@ -19,10 +19,7 @@ public:
 
 public:
 	virtual double probability(const tuple<int, int, int>& datum) = 0;
-	virtual vector<int> infer_entity(const vector<int>& des) = 0;
-	virtual int infer_relation(const vector<int>& des) = 0;
 	virtual void train_knowledge(const tuple<int, int, int>& datum) = 0;
-	virtual void train_language(const int eid, const vector<int>& description) = 0;
 	virtual void save(FormatFile & file) = 0;
 	virtual void load(FormatFile & file) = 0;
 
@@ -45,17 +42,9 @@ public:
 	virtual void train_kernel(function<void()> fn_middle_process = [&](){})
 	{
 #pragma omp parallel for
-		for (auto i = dm.knowledge.begin();   i != dm.knowledge.end(); ++i)
+		for (auto i = dm.knowledge.begin(); i != dm.knowledge.end(); ++i)
 		{
 			train_knowledge(*i);
-		}
-
-		fn_middle_process();
-
-#pragma omp parallel for
-		for (int i = 0; i != dm.n_entity; ++i)
-		{
-			train_language(i, dm.description[i]);
 		}
 	}
 
@@ -77,5 +66,58 @@ public:
 		}
 
 		logout.record() << "Train Over";
+	}
+
+public:
+	void test()
+	{
+		double mean = 0;
+		double hits = 0;
+		double fmean = 0;
+		double fhits = 0;
+		double rmrr = 0;
+		double fmrr = 0;
+		int total = 0;
+
+#pragma omp parallel for
+		for (auto i = dm.knowledge.end() - 16*6; i!= dm.knowledge.end(); ++i)
+		{
+			tuple<int, int, int> t = *i;
+			int frmean = 0;
+			int rmean = 0;
+			double score_i = probability(*i);
+
+			for (auto j = 0; j != dm.n_entity; ++j)
+			{
+				get<2>(t) = j;
+
+				if (score_i >= probability(t))
+					continue;
+
+				++rmean;
+
+				if (dm.sampling_checker.find(t) == dm.sampling_checker.end())
+				{
+					++frmean;
+				}
+			}
+
+#pragma omp critical
+			{
+				mean += rmean;
+				fmean += frmean;
+				rmrr += 1.0 / (rmean + 1);
+				fmrr += 1.0 / (frmean + 1);
+
+				if (rmean < 10)
+					++hits;
+				if (frmean < 10)
+					++fhits;
+			}
+		}
+
+		logout.record() << "[Test] fHITS@10 = " << fhits / (96 * 6);
+
+		std::cout.flush();
 	}
 };

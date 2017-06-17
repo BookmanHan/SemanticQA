@@ -11,7 +11,6 @@ public:
 		vector<vec> rep_entity;
 		vector<vec> rep_relation_subj;
 		vector<vec> rep_relation_obj;
-		vector<vec> rep_word;
 	} _p, _derv_x, _derv_grad;
 
 public:
@@ -36,10 +35,6 @@ public:
 		_p.rep_relation_obj.resize(relation_count);
 		for_each(_p.rep_relation_obj.begin(), _p.rep_relation_obj.end(),
 			[=](vec& elem){elem = normalise(randu(dim), 2); });
-  
-		_p.rep_word.resize(word_count); 
-		for_each(_p.rep_word.begin(), _p.rep_word.end(),
-			[=](vec& elem){elem = normalise(randu(dim), 2); });
 
 		_derv_x.rep_entity.resize(entity_count);
 		for_each(_derv_x.rep_entity.begin(), _derv_x.rep_entity.end(),
@@ -53,10 +48,6 @@ public:
 		for_each(_derv_x.rep_relation_obj.begin(), _derv_x.rep_relation_obj.end(),
 			[=](vec& elem){elem = zeros(dim); });
 
-		_derv_x.rep_word.resize(word_count);
-		for_each(_derv_x.rep_word.begin(), _derv_x.rep_word.end(),
-			[=](vec& elem){elem = zeros(dim); });
-
 		_derv_grad.rep_entity.resize(entity_count);
 		for_each(_derv_grad.rep_entity.begin(), _derv_grad.rep_entity.end(),
 			[=](vec& elem){elem = zeros(dim); });
@@ -68,25 +59,21 @@ public:
 		_derv_grad.rep_relation_obj.resize(relation_count);
 		for_each(_derv_grad.rep_relation_obj.begin(), _derv_grad.rep_relation_obj.end(),
 			[=](vec& elem){elem = zeros(dim); });
-
-		_derv_grad.rep_word.resize(word_count);
-		for_each(_derv_grad.rep_word.begin(), _derv_grad.rep_word.end(),
-			[=](vec& elem){elem = zeros(dim); });
 	}
 
 public:
 	void save(FormatFile & file)
 	{
-		file << _p.rep_entity << _p.rep_relation_subj << _p.rep_relation_obj << _p.rep_word;
-		file << _derv_x.rep_entity << _derv_x.rep_relation_subj << _derv_x.rep_relation_obj << _derv_x.rep_word;
-		file << _derv_grad.rep_entity << _derv_grad.rep_relation_subj << _derv_grad.rep_relation_obj << _derv_grad.rep_word;
+		file << _p.rep_entity << _p.rep_relation_subj << _p.rep_relation_obj;
+		file << _derv_x.rep_entity << _derv_x.rep_relation_subj << _derv_x.rep_relation_obj;
+		file << _derv_grad.rep_entity << _derv_grad.rep_relation_subj << _derv_grad.rep_relation_obj;
 	}
 
 	void load(FormatFile & file)
 	{
-		file >> _p.rep_entity >> _p.rep_relation_subj >> _p.rep_relation_obj >> _p.rep_word;
-		file >> _derv_x.rep_entity >> _derv_x.rep_relation_subj >> _derv_x.rep_relation_obj >> _derv_x.rep_word;
-		file >> _derv_grad.rep_entity >> _derv_grad.rep_relation_subj >> _derv_grad.rep_relation_obj >> _derv_grad.rep_word;
+		file >> _p.rep_entity >> _p.rep_relation_subj >> _p.rep_relation_obj;
+		file >> _derv_x.rep_entity >> _derv_x.rep_relation_subj >> _derv_x.rep_relation_obj;
+		file >> _derv_grad.rep_entity >> _derv_grad.rep_relation_subj >> _derv_grad.rep_relation_obj;
 	}
 
 public:
@@ -158,37 +145,6 @@ public:
 			_p.rep_relation_obj[get<1>(triplet)],
 			grad_relation_tail);
 	}
-
-	void train_language
-		(const int eid, const vector<int>& descriptions)
-	{
-		vec& entity = _p.rep_entity[eid];
-		vec grad_entity = zeros(dim);
-
-		for (auto i = descriptions.begin(); i != descriptions.end(); ++i)
-		{
-			grad_entity -= sign(entity - _p.rep_word[*i]);
-			_p.rep_word[*i] += entity;
-		}
-
-		solver.gradient(
-			_derv_grad.rep_entity[eid],
-			_derv_x.rep_entity[eid],
-			_p.rep_entity[eid],
-			grad_entity);
-	}
-
-	void pre_train_language()
-	{
-		for_each(_p.rep_word.begin(), _p.rep_word.end(),
-			[=](vec& elem){elem = zeros(dim); });
-	}
-
-	void post_train_language()
-	{
-		for_each(_p.rep_word.begin(), _p.rep_word.end(),
-			[=](vec& elem){elem = normalise(elem, 2); });
-	}
 };
 
 class JointMFactor
@@ -197,7 +153,8 @@ class JointMFactor
 protected:
 	vector<JointMFactorUnit*>	factors;
 	vector<vec> rep_entity;
-	vector<vec> rep_word;
+	vector<vec> rep_relation_subj;
+	vector<vec> rep_relation_obj;
 
 public:
 	AscentAdaDeltaPositive& solver;
@@ -257,122 +214,60 @@ public:
 		}
 	}
 
-	virtual void train_language(const int eid, const vector<int>& description) override
-	{
-		for (auto factor : factors)
-		{
-			factor->train_language(eid, description);
-		}
-	}
-
 	virtual void save(FormatFile & file) override
 	{
+		rep_entity.clear();
+		for (auto i = 0; i < dm.n_entity; ++i)
+		{
+			vec rep;
+			for (auto factor : factors)
+			{
+				rep = join_cols(rep, factor->_p.rep_entity[i]);
+			}
+			rep_entity.push_back(rep);
+		}
+
+		rep_relation_subj.clear();
+		for (auto i = 0; i < dm.n_relation; ++i)
+		{
+			vec rep;
+			for (auto factor : factors)
+			{
+				rep = join_cols(rep, factor->_p.rep_relation_subj[i]);
+			}
+			rep_relation_subj.push_back(rep);
+		}
+
+		rep_relation_obj.clear();
+		for (auto i = 0; i < dm.n_relation; ++i)
+		{
+			vec rep;
+			for (auto factor : factors)
+			{
+				rep = join_cols(rep, factor->_p.rep_relation_obj[i]);
+			}
+			rep_relation_obj.push_back(rep);
+		}
+
+		file << rep_entity;
+		file << rep_relation_subj;
+		file << rep_relation_obj;
+
 		for (auto factor : factors)
 		{
 			factor->save(file);
 		}
-
-		file << rep_entity;
-		file << rep_word;
 	}
 
 	virtual void load(FormatFile & file) override
 	{
+		file >> rep_entity;
+		file >> rep_relation_subj;
+		file >> rep_relation_obj;
+
 		for (auto factor : factors)
 		{
 			factor->load(file);
-		}
-
-		file >> rep_entity;
-		file >> rep_word;
-	}
-
-	virtual vector<int> infer_entity(const vector<int>& des) override
-	{
-		vector<pair<double, int>> prob_ent(dm.n_entity);
-		for (auto i = 0; i < dm.n_entity; ++i)
-		{
-			prob_ent[i].second = i;
-		}
-
-		vec rep_query = ones(n_factor * dim);
-		for (auto iw = des.begin(); iw != des.end(); ++iw)
-		{
-			rep_query %= rep_word[*iw];
-		}
-		rep_query = normalise(rep_query, 2);
-
-		for (auto ie = 0; ie < dm.n_entity; ++ie)
-		{
-			prob_ent[ie].first = as_scalar(rep_query.t() * rep_entity[ie]);
-		}
-
-		//for (auto ie = 0; ie < dm.n_entity; ++ie)
-		//{
-		//	prob_ent[ie].first = 0.0;
-		//	for (auto iw = des.begin(); iw != des.end(); ++iw)
-		//	{
-		//		prob_ent[ie].first += as_scalar(rep_word[*iw].t() * rep_entity[ie]);
-		//	}
-		//}
-
-		sort(prob_ent.begin(), prob_ent.end(), greater<pair<double, int>>());
-
-		vector<int> res;
-		for (int i = 0; i < 10; ++i)
-		{
-			res.push_back(prob_ent[i].second);
-		}
-
-		logout.record() << "[Values] ";
-		for_each(prob_ent.begin(), prob_ent.begin() + 10,
-			[=](pair<double, int>& elem){logout << elem.first << ", "; });
-
-		return res;
-	}
-
-	virtual int infer_relation(const vector<int>& des) override
-	{
-		return 0;
-	}
-
-	virtual void train_kernel(function<void()> fn_middle_process = [&](){}) override
-	{
-		Model::train_kernel(
-			[&](void)
-		{
-			fn_middle_process();
-			for (auto factor : factors)
-			{
-				factor->pre_train_language();
-			}
-		});
-
-		for (auto factor : factors)
-		{
-			factor->post_train_language();
-		}
-
-		rep_word.resize(dm.n_word);
-		for (auto i = 0; i < dm.n_word; ++i)
-		{
-			vec tmp;
-			for (auto factor : factors)
-			{
-				tmp = join_cols(tmp, factor->_p.rep_word[i]);
-			}
-			rep_word[i] = tmp;
-		}
-
-		rep_entity.resize(dm.n_entity);
-		for (auto i = 0; i < dm.n_entity; ++i)
-		{			
-			vec tmp;
-			for (auto factor : factors)
-			{
-				tmp = join_cols(tmp, factor->_p.rep_entity[i]);
-			}
-			rep_entity[i] = tmp;
 		}
 	}
 };

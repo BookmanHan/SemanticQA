@@ -33,9 +33,6 @@ double sign(const double& x)
 		return x > 0 ? +1 : -1;
 }
 
-function<double(double)> sigmoid = [](const double x) {return 1.0 / (1.0 + exp(-x)); };
-function<double(double)> sigmoid_derv = [](const double x) {return sigmoid(x) * (1.0 - sigmoid(x)); };
-
 template<typename T>
 string operator - (const string& src, T& elem)
 {

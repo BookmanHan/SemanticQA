@@ -65,9 +65,8 @@ public:
 		logout.record() << "[Task]\tEntity Answering";
 
 		current.bm_accu = 0;
-		int n_TOTAL = 1000;
 
-		current.bm_accu /= n_TOTAL;
+		current.bm_accu /= dm.ds_question_test.size();
 
 		string inc_mark_hit = "";
 		if (best.bm_accu <= current.bm_accu)
